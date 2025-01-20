@@ -2,7 +2,7 @@
 
 NodeLds01::NodeLds01()
 : Node("node_lds01"), 
-  serial_laser(loop,"/dev/ttyUSB0"), 
+  serial_laser(loop,"/dev/ttyUSB2"), 
   tf_broadcaster_(this) 
 {
     // QoS 설정 수정: rclcpp::SensorDataQoS로 기본값 설정
@@ -11,7 +11,6 @@ NodeLds01::NodeLds01()
     // 신뢰성 있는 메시지 전송을 위해 Reliable 설정 추가
     qos_profile.reliability(rclcpp::ReliabilityPolicy::Reliable);
 
-    // 퍼블리셔 생성
     publisher_laser = this->create_publisher<sensor_msgs::msg::LaserScan>("scan", qos_profile);
     msg_laser = std::make_shared<sensor_msgs::msg::LaserScan>();
 
