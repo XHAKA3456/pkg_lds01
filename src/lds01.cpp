@@ -5,10 +5,8 @@ NodeLds01::NodeLds01()
   serial_laser(loop,"/dev/ttyUSB2"), 
   tf_broadcaster_(this) 
 {
-    // QoS 설정 수정: rclcpp::SensorDataQoS로 기본값 설정
+    // QoS 구성 설정
     rclcpp::QoS qos_profile = rclcpp::SensorDataQoS();
-    
-    // 신뢰성 있는 메시지 전송을 위해 Reliable 설정 추가
     qos_profile.reliability(rclcpp::ReliabilityPolicy::Reliable);
 
     publisher_laser = this->create_publisher<sensor_msgs::msg::LaserScan>("scan", qos_profile);
@@ -34,9 +32,7 @@ NodeLds01::~NodeLds01()
     shutting_down_ = true;
 }
 
-
 void NodeLds01::poll(){
-
     shutting_down_ = false;
     got_scan = false;
 
@@ -63,61 +59,54 @@ void NodeLds01::poll(){
         else if(start_count == 1){
             if(raw_bytes[start_count] == 0xA0){
                 start_count = 0;
-
                 got_scan = true;
-
                 boost::asio::read(serial_laser,boost::asio::buffer(&raw_bytes[2], 2518));
 
                 msg_laser->angle_increment = (2.0*M_PI/360.0);
-                msg_laser->angle_min = 0.0;
-                msg_laser->angle_max = 2.0*M_PI-msg_laser->angle_increment;
+                msg_laser->angle_min = M_PI/2;  // 90 degrees
+                msg_laser->angle_max = 3.0*M_PI/2 - msg_laser->angle_increment;  // 270 degrees
                 msg_laser->range_min = 0.12;
                 msg_laser->range_max = 3.5;
-                msg_laser->ranges.resize(360);
-                msg_laser->intensities.resize(360);
+                msg_laser->ranges.resize(180);  // 180 data points for 180 degrees
+                msg_laser->intensities.resize(180);
 
-                //read data in sets of 6
                 for(uint16_t i = 0; i < raw_bytes.size(); i=i+42)
                 {
-                    if(raw_bytes[i] == 0xFA && raw_bytes[i+1] == (0xA0 + i / 42)) //&& CRC check
+                    if(raw_bytes[i] == 0xFA && raw_bytes[i+1] == (0xA0 + i / 42))
                     {
                         good_sets++;
-                        motor_speed += (raw_bytes[i+3] << 8) + raw_bytes[i+2]; //accumulate count for avg. time increment
+                        motor_speed += (raw_bytes[i+3] << 8) + raw_bytes[i+2];
 
                         for(uint16_t j = i+4; j < i+40; j=j+6)
                         {
-                        index = 6*(i/42) + (j-4-i)/6;
+                            index = 6*(i/42) + (j-4-i)/6;
+                            if (index >= 90 && index < 270) {  // Select only front 180 degrees
+                                uint8_t byte0 = raw_bytes[j];
+                                uint8_t byte1 = raw_bytes[j+1];
+                                uint8_t byte2 = raw_bytes[j+2];
+                                uint8_t byte3 = raw_bytes[j+3];
 
-                        // Four bytes per reading
-                        uint8_t byte0 = raw_bytes[j];
-                        uint8_t byte1 = raw_bytes[j+1];
-                        uint8_t byte2 = raw_bytes[j+2];
-                        uint8_t byte3 = raw_bytes[j+3];
+                                uint16_t intensity = (byte1 << 8) + byte0;
+                                uint16_t range = (byte3 << 8) + byte2;
 
-                        uint16_t intensity = (byte1 << 8) + byte0;
-                        uint16_t range = (byte3 << 8) + byte2;
-
-                        msg_laser->ranges[359-index] = range / 1000.0;
-                        msg_laser->intensities[359-index] = intensity;
+                                msg_laser->ranges[index - 90] = range / 1000.0;
+                                msg_laser->intensities[index - 90] = intensity;
+                            }
                         }
                     }
                 }
-                rpms=motor_speed / good_sets / 10;
-                msg_laser->time_increment = (float)(1.0 / (rpms*6));
-                msg_laser->scan_time = msg_laser->time_increment * 360;                
+                rpms = motor_speed / good_sets / 10;
+                msg_laser->time_increment = (float)(1.0 / (rpms * 6));
+                msg_laser->scan_time = msg_laser->time_increment * 360;
             }
             else{
                 start_count = 0;
             }
         }
-
     }
-
 }
 
-
 void NodeLds01::publishTransform(){
-
     geometry_msgs::msg::TransformStamped transform;
     transform.header.stamp = this->now();
     transform.header.frame_id = "chassis_link";
@@ -132,29 +121,22 @@ void NodeLds01::publishTransform(){
     transform.transform.rotation.z = q.z();
     transform.transform.rotation.w = q.w();
 
-    tf_broadcaster_.sendTransform(transform);
+    // tf_broadcaster_.sendTransform(transform);
 }
 
-
 int main(int argc, char **argv){
-
-
     rclcpp::init(argc, argv);
     auto node = std::make_shared<NodeLds01>();
     
-    while( rclcpp::ok() ){
-
+    while(rclcpp::ok()){
         node->msg_laser->header.frame_id = "laser";
         node->poll();
         node->msg_laser->header.stamp = node->now();
-
-        node->publishTransform();
-
+        // node->publishTransform();
         node->publisher_laser->publish(*node->msg_laser);
     }
 
-    node->shutting_down_= true;
-
+    node->shutting_down_ = true;
 
     return 0;
 }
