@@ -97,7 +97,7 @@ void NodeLds01::poll(){
                 }
                 rpms = motor_speed / good_sets / 10;
                 msg_laser->time_increment = (float)(1.0 / (rpms * 6));
-                msg_laser->scan_time = msg_laser->time_increment * 360;
+                msg_laser->scan_time = msg_laser->time_increment * 180;
             }
             else{
                 start_count = 0;
