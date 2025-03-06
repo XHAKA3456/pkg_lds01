@@ -63,12 +63,12 @@ void NodeLds01::poll(){
                 boost::asio::read(serial_laser,boost::asio::buffer(&raw_bytes[2], 2518));
 
                 msg_laser->angle_increment = (2.0*M_PI/360.0);
-                msg_laser->angle_min = M_PI/2;  // 90 degrees
-                msg_laser->angle_max = 3.0*M_PI/2 - msg_laser->angle_increment;  // 270 degrees
+                msg_laser->angle_min = M_PI/4;  // 45 degrees
+                msg_laser->angle_max = 7.0*M_PI/4 - msg_laser->angle_increment;  // 315 degrees
                 msg_laser->range_min = 0.12;
                 msg_laser->range_max = 3.5;
-                msg_laser->ranges.resize(180);  // 180 data points for 180 degrees
-                msg_laser->intensities.resize(180);
+                msg_laser->ranges.resize(270);  // 180 data points for 180 degrees
+                msg_laser->intensities.resize(270);
 
                 for(uint16_t i = 0; i < raw_bytes.size(); i=i+42)
                 {
@@ -80,7 +80,7 @@ void NodeLds01::poll(){
                         for(uint16_t j = i+4; j < i+40; j=j+6)
                         {
                             index = 6*(i/42) + (j-4-i)/6;
-                            if (index >= 90 && index < 270) {  // Select only front 180 degrees
+                            if (index >= 45 && index < 315) {  // Select only front 180 degrees
                                 uint8_t byte0 = raw_bytes[j];
                                 uint8_t byte1 = raw_bytes[j+1];
                                 uint8_t byte2 = raw_bytes[j+2];
@@ -89,15 +89,15 @@ void NodeLds01::poll(){
                                 uint16_t intensity = (byte1 << 8) + byte0;
                                 uint16_t range = (byte3 << 8) + byte2;
 
-                                msg_laser->ranges[index - 90] = range / 1000.0;
-                                msg_laser->intensities[index - 90] = intensity;
+                                msg_laser->ranges[index - 45] = range / 1000.0;
+                                msg_laser->intensities[index - 45] = intensity;
                             }
                         }
                     }
                 }
                 rpms = motor_speed / good_sets / 10;
                 msg_laser->time_increment = (float)(1.0 / (rpms * 6));
-                msg_laser->scan_time = msg_laser->time_increment * 180;
+                msg_laser->scan_time = msg_laser->time_increment * 270;
             }
             else{
                 start_count = 0;
