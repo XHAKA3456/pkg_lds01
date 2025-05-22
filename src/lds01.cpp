@@ -5,6 +5,7 @@ NodeLds01::NodeLds01()
   serial_laser(loop,"/dev/ttyUSB2"), 
   tf_broadcaster_(this) 
 {
+    //123123
     // QoS 구성 설정
     rclcpp::QoS qos_profile = rclcpp::SensorDataQoS();
     qos_profile.reliability(rclcpp::ReliabilityPolicy::Reliable);
